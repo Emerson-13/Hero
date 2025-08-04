@@ -63,9 +63,9 @@ console.log("Permissions:", permissions);
                                     </NavLink>
                                 )}
                                 {permissions.includes('view products') && (
-                                    <NavLink href={route('merchant.products')} active={route().current('merchant.products')}>
-                                        Products
-                                    </NavLink>
+                                    user.merchant_id
+                                        ? <NavLink href={route('staff.products')} active={route().current('staff.products')}>Products</NavLink>
+                                        : <NavLink href={route('merchant.products')} active={route().current('merchant.products')}>Products</NavLink>
                                 )}
                                 {permissions.includes('view categories') && (
                                     <NavLink href={route('merchant.categories')} active={route().current('merchant.categories')}>
@@ -82,10 +82,10 @@ console.log("Permissions:", permissions);
                                         Transactions
                                     </NavLink>
                                 )}
-                                {permissions.includes('view pos') && (
-                                    <NavLink href={route('merchant.pos')} active={route().current('merchant.pos')}>
-                                        POS
-                                    </NavLink>
+                               {permissions.includes('view pos') && (
+                                    user.merchant_id
+                                        ? <NavLink href={route('staff.pos')} active={route().current('staff.pos')}>POS</NavLink>
+                                        : <NavLink href={route('merchant.pos')} active={route().current('merchant.pos')}>POS</NavLink>
                                 )}
 
                                 {/* STAFF DASHBOARD */}
@@ -166,9 +166,9 @@ console.log("Permissions:", permissions);
                             </ResponsiveNavLink>
                         )}
                         {permissions.includes('view products') && (
-                            <ResponsiveNavLink href={route('merchant.products')} active={route().current('merchant.products')}>
-                                Products
-                            </ResponsiveNavLink>
+                             user.merchant_id
+                                    ? <NavLink href={route('staff.products')} active={route().current('staff.products')}>Products</NavLink>
+                                    : <NavLink href={route('merchant.products')} active={route().current('merchant.products')}>Products</NavLink>
                         )}
                         {permissions.includes('view categories') && (
                             <ResponsiveNavLink href={route('merchant.categories')} active={route().current('merchant.categories')}>
@@ -185,23 +185,20 @@ console.log("Permissions:", permissions);
                                 Transactions
                             </ResponsiveNavLink>
                         )}
-
-                    
+                            
                         {permissions.includes('view pos') && (
-                            <ResponsiveNavLink href={route('merchant.products')} active={route().current('merchant.products')}>
-                                POS
-                            </ResponsiveNavLink>
+                            user.merchant_id
+                                        ? <NavLink href={route('staff.pos')} active={route().current('staff.pos')}>POS</NavLink>
+                                        : <NavLink href={route('merchant.pos')} active={route().current('merchant.pos')}>POS</NavLink>
                         )}
+
+                        {/* staff nav */}
                         {permissions.includes('view staff-dashboard') && (
                             <ResponsiveNavLink href={route('staff.dashboard')} active={route().current('staff.dashboard')}>
                                 Staff Dashboard
                             </ResponsiveNavLink>
                         )}
-                         {permissions.includes('view pos') && (
-                            <ResponsiveNavLink href={route('staff.pos')} active={route().current('staff.pos')}>
-                                Staff Dashboard
-                            </ResponsiveNavLink>
-                        )}
+
                     </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">

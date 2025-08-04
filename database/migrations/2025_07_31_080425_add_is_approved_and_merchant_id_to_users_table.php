@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('is_approved')->default(false);
-            $table->unsignedBigInteger('merchant_id')->nullable()->after('id');
-
+                $table->unsignedBigInteger('merchant_id')->nullable()->after('id');
             $table->foreign('merchant_id')->references('id')->on('users')->onDelete('cascade');
+            $table->enum('merchant_type', ['restaurant', 'supermarket'])->default('supermarket');
         });
     }
 

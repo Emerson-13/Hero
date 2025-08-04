@@ -18,7 +18,10 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
             $table->integer('stock')->default(0);
-            $table->timestamps();
+            $table->timestamps();   
+            // In create_products_table migration
+            $table->unsignedBigInteger('category_id')->nullable();
+            $table->foreign('category_id')->references('id')->on('categories')->onDelete('set null');
 
             $table->foreign('merchant_id')->references('id')->on('users')->onDelete('cascade');
         });

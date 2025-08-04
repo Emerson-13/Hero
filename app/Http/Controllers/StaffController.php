@@ -22,7 +22,10 @@ class StaffController extends Controller
         ->select('id', 'name', 'email', 'is_approved') // ✅ this is correct way to limit columns
         ->get();
 
-    return response()->json($staff); // ✅ return the staff, not just merchantId
+    return Inertia::render('Merchant/Staff', [
+    'staff' => $staff,
+    ]);
+
 }
 
     public function create()

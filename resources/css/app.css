@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@media print {
+  body {
+    width: 80mm; /* or 58mm if you're using smaller paper */
+    margin: 0;
+  }
+
+  .print-receipt {
+    width: 80mm;
+    font-family: monospace;
+  }
+
+  button, .print-hidden {
+    display: none !important;
+  }
+
+  @page {
+    margin: 0;
+    size: 80mm auto; /* auto height */
+  }
+}
+
