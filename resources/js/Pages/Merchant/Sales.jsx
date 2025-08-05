@@ -45,9 +45,11 @@ export default function Sales() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sales.length > 0 ? (
-                                        sales.map((sale, index) => (
-                                            <tr key={sale.id}>
+                                     {sales.length > 0 ? (
+                                        [...sales]
+                                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort by newest first
+                                            .map((sale, index) => (
+                                                <tr key={sale.id}>
                                                 <td className="border px-4 py-2">{index + 1}</td>
                                                 <td className="border px-4 py-2">{sale.transaction_id}</td>
                                                 <td className="border px-4 py-2">{sale.product_name}</td>
@@ -56,7 +58,7 @@ export default function Sales() {
                                                 <td className="border px-4 py-2">₱{Number(sale.discount).toFixed(2)}</td>
                                                 <td className="border px-4 py-2">₱{Number(sale.tax).toFixed(2)}</td>
                                                 <td className="border px-4 py-2 font-semibold text-green-700">₱{Number(sale.total).toFixed(2)}</td>
-                                                <td className="border px-4 py-2">{sale.created_at   }</td>
+                                                <td className="border px-4 py-2">{sale.created_at}</td>
                                                 <td className="border px-4 py-2">
                                                     <DangerButton onClick={() => handleDelete(sale.id)}>
                                                         Delete

@@ -1,24 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PrimaryButton from '@/Components/PrimaryButton';
 import Pagination from '@/Components/Pagination';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
+
 
 export default function POS() {
-    const { products, categories = [], selectedCategory = 'all' } = usePage().props;
+    const { products, categories = [], selectedCategory = 'all', totals: initialTotals = null } = usePage().props;
 
     const [cart, setCart] = useState([]);
     const [discountCode, setDiscountCode] = useState('');
-    const [isDiscountApproved, setIsDiscountApproved] = useState(false);
 
-    const { data, setData, post, reset } = useForm({
+    const [totals, setTotals] = useState({
+        subtotal: 0,
+        discount: 0,
+        tax: 0,
+        total: 0,
+        change: 0,
+    });
+
+    const { data, setData, reset } = useForm({
         customer_name: '',
         payment_method: 'cash',
         amount_paid: '',
     });
 
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const change = data.amount_paid - total;
+    useEffect(() => {
+        const items = cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity,
+        }));
+
+        axios.post(route('pos.calculate'), {
+            items,
+            discount_code: discountCode,
+            amount_paid: parseFloat(data.amount_paid) || 0,
+        })
+        .then(res => setTotals(res.data))
+        .catch(() => setTotals({ subtotal: 0, discount: 0, tax: 0, total: 0, change: 0 }));
+    }, [cart, discountCode, data.amount_paid]);
 
     const addToCart = (product) => {
         const existing = cart.find(item => item.id === product.id);
@@ -44,33 +65,34 @@ export default function POS() {
         });
     };
 
+    const handleSubmit = () => {
+        if (!cart.length) return alert('Cart is empty.');
+       if ((data.amount_paid || 0) < (totals?.total || 0)) return alert('Amount paid is less than total.');
 
-  const handleSubmit = () => {
-    if (!cart.length) return alert('Cart is empty.');
-    if (data.amount_paid < total) return alert('Amount paid is less than total.');
+    if (data.payment_method === 'online') {
+        alert('🚫 Online payment is currently not available. Please choose "Cash" instead.');
+        return;
+    }
+        const items = cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity,
+        }));
 
-    const items = cart.map(item => ({
-        product_id: item.id,
-        quantity: item.quantity,
-    }));
-
-    router.post(route('pos.store'), {
-        ...data,
-        items,
-        total,
-        discount_code: discountCode, // ✅ silently send to backend
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            alert('✅ Sale completed!');
-            setCart([]);
-            setData('amount_paid', '');
-            setDiscountCode('');
-            reset();
-        },
-    });
-};
-
+        router.post(route('pos.store'), {
+            ...data,
+            items,
+            total: totals?.total || 0,
+            discount_code: discountCode,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                alert('✅ Sale completed!');
+                setCart([]);
+                reset();
+                setDiscountCode('');
+            },
+        });
+    };
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold">POS</h2>}>
@@ -151,9 +173,6 @@ export default function POS() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="mt-2 text-right font-semibold">
-                                    <p>Total: ₱{total}</p>
-                                </div>
 
                                 {/* Discount Approval Section */}
                                 <div className="mt-4 space-y-2">
@@ -165,8 +184,16 @@ export default function POS() {
                                         onChange={(e) => setDiscountCode(e.target.value)}
                                         className="border p-2 rounded block w-full"
                                     />
-                                    <p className="text-xs text-gray-500">This is required for PWD/Senior discount. Only authorized personnel may enter this.</p>
-                                </div>
+                                    <p className="text-xs text-gray-500">Required for PWD/Senior discount if enabled by admin.</p>
+                               {totals.discount > 0 && (
+  <p className="text-green-600 text-sm">✅ Discount code applied: -₱{totals.discount.toFixed(2)}</p>
+)}
+
+                                    {discountCode && totals.discount === 0 && (
+                                        <p className="text-red-600 text-sm">❌ Invalid discount code or not allowed</p>
+                                    )}
+                                 </div>
+                                 
 
                                 {/* Customer Info */}
                                 <div className="mt-4 space-y-2">
@@ -183,8 +210,7 @@ export default function POS() {
                                         className="border p-2 rounded block w-full"
                                     >
                                         <option value="cash">Cash</option>
-                                        <option value="gcash">GCash</option>
-                                        <option value="card">Card</option>
+                                        <option value="online">Online</option>
                                     </select>
                                     <input
                                         type="number"
@@ -193,10 +219,29 @@ export default function POS() {
                                         onChange={(e) => setData('amount_paid', parseFloat(e.target.value))}
                                         className="border p-2 rounded block w-full"
                                     />
-                                    <p className="font-medium">Change: ₱{change >= 0 ? change : 0}</p>
                                 </div>
 
-                                <PrimaryButton onClick={handleSubmit} className="mt-4 w-full">
+                                {/* Computed Totals */}
+                                <div className="mt-4 text-sm text-right space-y-1 font-medium border-t pt-3">
+                                   {cart.length > 0 ? (
+    <div className="text-right space-y-1 mt-4 text-sm">
+        <p>Subtotal: ₱{totals.subtotal.toFixed(2)}</p>
+        <p>Discount: ₱{totals.discount.toFixed(2)}</p>
+        <p>Tax: ₱{totals.tax.toFixed(2)}</p>
+        <p className="font-semibold">Total: ₱{totals.total.toFixed(2)}</p>
+        <p className="font-medium">Change: ₱{totals.change.toFixed(2)}</p>
+    </div>
+) : (
+    <p className="text-gray-500">Cart is empty.</p>
+)}
+
+                                </div>
+
+                                <PrimaryButton
+                                    onClick={handleSubmit}
+                                    className="mt-4 w-full"
+                                  disabled={!cart.length || (totals?.total > data.amount_paid)}
+                                >
                                     Complete Sale
                                 </PrimaryButton>
                             </div>

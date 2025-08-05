@@ -25,6 +25,9 @@ class RoleAndPermissionSeeder extends Seeder
             'view transactions',
             'view pos',
             'view staff',
+            'view settings',
+            'view discounts',
+            'view payments',
         ];
 
         foreach ($permissions as $permission) {
@@ -49,6 +52,9 @@ class RoleAndPermissionSeeder extends Seeder
             'view transactions',
             'view pos',
             'view staff',
+             'view settings',
+            'view discounts',
+            'view payments',
         ]);
 
         // Staff Role

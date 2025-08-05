@@ -6,24 +6,20 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Transaction;
+use App\Models\Discount;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class POSController extends Controller
 {
-    // app/Http/Controllers/POSController.php
     public function index(Request $request)
     {
         $merchantId = auth()->user()->merchant_id ?? auth()->id();
 
-        // ✅ Define query
         $query = Product::where('merchant_id', $merchantId);
-
-        // ✅ Now it's safe to apply filters
         if ($request->has('category') && $request->category !== 'all') {
             $query->where('category_id', $request->category);
         }
@@ -31,16 +27,23 @@ class POSController extends Controller
         $products = $query->paginate(6);
         $categories = Category::where('merchant_id', $merchantId)->get();
 
+        $totals = null;
+        if ($request->filled('items')) {
+            $items = $request->input('items', []);
+            $discountCode = $request->input('discount_code');
+            $amountPaid = $request->input('amount_paid', 0);
+            $totals = $this->computeTotals($items, $discountCode, $amountPaid, $merchantId);
+        }
+
         return Inertia::render('Merchant/Pos', [
             'products' => $products,
             'categories' => $categories,
             'selectedCategory' => $request->category ?? 'all',
+            'totals' => $totals,
         ]);
     }
 
-
-
-    public function store(Request $request)
+   public function store(Request $request)
 {
     $validated = $request->validate([
         'customer_name' => 'nullable|string|max:255',
@@ -53,21 +56,21 @@ class POSController extends Controller
         'discount_code' => 'nullable|string',
     ]);
 
-    $merchantId = auth()->user()->merchant_id ?? auth()->id();
-    $staffId = auth()->user()->merchant_id ? auth()->id() : null;
+    $user = auth()->user();
+    $merchantId = $user->merchant_id ?? $user->id;
+    $staffId = $user->merchant_id ? $user->id : null;
 
-    // ✅ Discount logic
-    $discountRate = 0;
-    $validCodes = [
-        'DISCOUNT2025' => 0.20, // 20% discount
-    ];
+    $enteredCode = strtoupper(trim($validated['discount_code']));
+    $discount = \App\Models\Discount::where('merchant_id', $merchantId)
+        ->where('code', $enteredCode)
+        ->where('is_active', true)
+        ->first();
 
-    if (!empty($validated['discount_code'])) {
-        $enteredCode = strtoupper(trim($validated['discount_code']));
-        if (array_key_exists($enteredCode, $validCodes)) {
-            $discountRate = $validCodes[$enteredCode];
-        }
-    }
+    $discountRate = $discount && $discount->type === 'percentage' ? ($discount->value / 100) : 0;
+    $appliesTo = $discount->applies_to ?? 'none';
+    $targetIds = is_array($discount->target_ids)
+        ? $discount->target_ids
+        : json_decode($discount->target_ids, true) ?? [];
 
     DB::beginTransaction();
 
@@ -79,42 +82,78 @@ class POSController extends Controller
             'payment_method' => $validated['payment_method'],
             'customer_name' => $validated['customer_name'],
             'amount_paid' => $validated['amount_paid'],
-            'total' => 0, // Will be updated after computing
+            'total' => 0,
             'reference_number' => null,
         ]);
 
+        $subtotal = 0;
+        $totalTax = 0;
+        $totalDiscount = 0;
         $grandTotal = 0;
 
         foreach ($validated['items'] as $item) {
-            $product = Product::findOrFail($item['product_id']);
-            $quantity = $item['quantity'];
+            $product = Product::where('merchant_id', $merchantId)->findOrFail($item['product_id']);
+            $qty = $item['quantity'];
             $price = $product->price;
+            $lineSubtotal = $qty * $price;
 
-            $subtotal = $price * $quantity;
-            $discount = $subtotal * $discountRate;
-            $tax = $subtotal * 0.12;
-            $total = $subtotal + $tax - $discount;
+            $subtotal += $lineSubtotal;
+
+            $isDiscounted = false;
+
+            if ($discountRate > 0) {
+                if ($appliesTo === 'all') {
+                    $isDiscounted = true;
+                } elseif ($appliesTo === 'categories' && in_array($product->category_id, $targetIds)) {
+                    $isDiscounted = true;
+                } elseif ($appliesTo === 'products' && in_array($product->id, $targetIds)) {
+                    $isDiscounted = true;
+                }
+            }
+
+            $discountAmount = 0;
+            $tax = 0;
+
+            if ($isDiscounted) {
+                // No tax for discounted item
+                $discountAmount = $lineSubtotal * $discountRate;
+            } else {
+                // 12% VAT for non-discounted item
+                $tax = $lineSubtotal * 0.12;
+                $totalTax += $tax;
+            }
+
+            $totalDiscount += $discountAmount;
+
+            $lineTotal = $lineSubtotal + $tax - $discountAmount;
+            $grandTotal += $lineTotal;
 
             Sale::create([
                 'transaction_id' => $transaction->id,
                 'product_id' => $product->id,
                 'product_name' => $product->name,
-                'quantity' => $quantity,
+                'quantity' => $qty,
                 'price' => $price,
-                'discount' => $discount,
-                'tax' => $tax,
-                'total' => $total,
+                'discount' => round($discountAmount, 2),
+                'tax' => round($tax, 2),
+                'total' => round($lineTotal, 2),
             ]);
 
-            $grandTotal += $total;
-            $product->decrement('stock', $quantity);
+            $product->decrement('stock', $qty);
         }
 
+        $change = max($validated['amount_paid'] - $grandTotal, 0);
+
         $transaction->update([
-            'total' => $grandTotal,
+            'subtotal' => round($subtotal, 2),
+            'discount' => round($totalDiscount, 2),
+            'tax' => round($totalTax, 2),
+            'total' => round($grandTotal, 2),
+            'change' => round($change, 2),
         ]);
 
         DB::commit();
+
         return redirect()->route('merchant.invoice.show', $transaction->id);
     } catch (\Exception $e) {
         DB::rollBack();
@@ -123,10 +162,95 @@ class POSController extends Controller
 }
 
 
-    
+    public function calculate(Request $request)
+    {
+        $items = $request->input('items', []);
+        $discountCode = $request->input('discount_code');
+        $amountPaid = $request->input('amount_paid', 0);
+        $merchantId = auth()->user()->merchant_id ?? auth()->id();
+
+        $totals = $this->computeTotals($items, $discountCode, $amountPaid, $merchantId);
+
+        return response()->json($totals);
+    }
+
+    private function computeTotals(array $items, $discountCode, $amountPaid, $merchantId)
+    {
+        $subtotal = 0;           // total price before any VAT or discount
+        $totalTax = 0;           // VAT only from non-discounted items
+        $totalDiscount = 0;      // discount amount from discounted items
+
+        $discount = \App\Models\Discount::where('merchant_id', $merchantId)
+            ->where('code', strtoupper(trim($discountCode)))
+            ->where('is_active', true)
+            ->first();
+
+        $discountRate = 0;
+        $appliesTo = 'none';
+        $targetIds = [];
+
+        if ($discount) {
+            $discountRate = $discount->type === 'percentage' ? ($discount->value / 100) : 0;
+            $appliesTo = $discount->applies_to;
+            $targetIds = is_array($discount->target_ids)
+                ? $discount->target_ids
+                : json_decode($discount->target_ids, true) ?? [];
+        }
+
+        foreach ($items as $item) {
+            $productId = Arr::get($item, 'product_id');
+            $qty = Arr::get($item, 'quantity', 0);
+
+            if (!$productId || $qty <= 0) continue;
+
+            $product = Product::where('merchant_id', $merchantId)->find($productId);
+            if (!$product) continue;
+
+            $price = $product->price; // standard price (no VAT)
+            $lineSubtotal = $price * $qty;
+            $subtotal += $lineSubtotal;
+
+            $isDiscounted = false;
+
+            if ($discountRate > 0) {
+                if ($appliesTo === 'all') {
+                    $isDiscounted = true;
+                } elseif ($appliesTo === 'categories' && in_array($product->category_id, $targetIds)) {
+                    $isDiscounted = true;
+                } elseif ($appliesTo === 'products' && in_array($product->id, $targetIds)) {
+                    $isDiscounted = true;
+                }
+            }
+
+            if ($isDiscounted) {
+                // Discounted items are VAT-exempt
+                $discountAmount = $lineSubtotal * $discountRate;
+                $totalDiscount += $discountAmount;
+                // No tax added
+            } else {
+                // Apply 12% VAT to non-discounted items
+                $vat = $lineSubtotal * 0.12;
+                $totalTax += $vat;
+            }
+        }
+
+        $total = $subtotal + $totalTax - $totalDiscount;
+        $change = max($amountPaid - $total, 0);
+
+        return [
+            'subtotal' => round($subtotal, 2),
+            'discount' => round($totalDiscount, 2),
+            'tax' => round($totalTax, 2),
+            'total' => round($total, 2),
+            'change' => round($change, 2),
+        ];
+    }
+
+
+
+
     public function showInvoice(Transaction $transaction)
     {
-        // Ensure the user can only see their merchant's invoices
         $user = auth()->user();
         $merchantId = $user->merchant_id ?? $user->id;
 

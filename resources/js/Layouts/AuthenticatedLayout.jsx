@@ -87,11 +87,21 @@ console.log("Permissions:", permissions);
                                         ? <NavLink href={route('staff.pos')} active={route().current('staff.pos')}>POS</NavLink>
                                         : <NavLink href={route('merchant.pos')} active={route().current('merchant.pos')}>POS</NavLink>
                                 )}
+                                 {permissions.includes('view discounts') && (
+                                    <NavLink href={route('merchant.discounts')} active={route().current('merchant.discounts')}>
+                                        Discount
+                                    </NavLink>
+                                )}
+                                {permissions.includes('view settings') && (
+                                    <NavLink href={route('merchant.settings')} active={route().current('merchant.settings')}>
+                                        Setting
+                                    </NavLink>
+                                )}
 
                                 {/* STAFF DASHBOARD */}
                                 {permissions.includes('view staff-dashboard') && (
                                     <NavLink href={route('staff.dashboard')} active={route().current('staff.dashboard')}>
-                                        Staff Dashboard
+                                        Dashboard
                                     </NavLink>
                                 )}
                             </div>

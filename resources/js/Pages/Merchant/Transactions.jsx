@@ -38,24 +38,34 @@ export default function Transaction() {
                                         <th className="border px-4 py-2">#</th>
                                         <th className="border px-4 py-2">Customer Name</th>
                                         <th className="border px-4 py-2">Invoice #</th>
-                                        <th className="border px-4 py-2">Payment Method</th>
+                                        
                                         <th className="border px-4 py-2">Amount Paid</th>
                                         <th className="border px-4 py-2">Total</th>
+                                        
+                                        <th className="border px-4 py-2">Change</th>
+                                        <th className="border px-4 py-2">Payment Method</th>
                                         <th className="border px-4 py-2">Reference #</th>
+                                        <th className="border px-4 py-2">Date</th>
                                         <th className="border px-4 py-2">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {transaction.length > 0 ? (
-                                        transaction.map((txn, index) => (
-                                            <tr key={txn.id}>
+                                        [...transaction]
+                                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort by newest first
+                                            .map((txn, index) => (
+                                                <tr key={txn.id}>
                                                 <td className="border px-4 py-2">{index + 1}</td>
                                                 <td className="border px-4 py-2">{txn.customer_name || '-'}</td>
                                                 <td className="border px-4 py-2">{txn.invoice_number}</td>
-                                                <td className="border px-4 py-2 capitalize">{txn.payment_method}</td>
+                                               
                                                 <td className="border px-4 py-2">₱{Number(txn.amount_paid).toFixed(2)}</td>
                                                 <td className="border px-4 py-2">₱{Number(txn.total).toFixed(2)}</td>
+                                               
+                                                  <td className="border px-4 py-2">{txn.change}</td>
+                                                   <td className="border px-4 py-2 capitalize">{txn.payment_method}</td>
                                                 <td className="border px-4 py-2">{txn.reference_number || '-'}</td>
+                                                 <td className="border px-4 py-2">{txn.created_at}</td>
                                                 <td className="border px-4 py-2 space-x-2">
                                                     <DangerButton onClick={() => handleDelete(txn.id)}>
                                                         Delete

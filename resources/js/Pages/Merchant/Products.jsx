@@ -60,7 +60,7 @@ export default function Products() {
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div className="bg-white p-6 shadow-sm sm:rounded-lg">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold">Product List</h3>
+                            <h3 className="text-lg font0-semibold">Product List</h3>
                             <PrimaryButton onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
                                 + Add Product
                             </PrimaryButton>

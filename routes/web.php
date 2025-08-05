@@ -12,6 +12,8 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\StaffProductController;
 use App\Http\Controllers\StaffPOSController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\DiscountController;
 /*
 |--------------------------------------------------------------------------
 | Public Routes
@@ -104,7 +106,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/staff/pos', [StaffPOSController::class, 'index'])->name('staff.pos');//Staff Page
         Route::post('/merchant/pos/sale', [POSController::class, 'store'])->name('pos.store');
         Route::get('/merchant/invoice/{transaction}', [POSController::class, 'showInvoice'])->name('merchant.invoice.show');
+        Route::post('/pos/calculate', [POSController::class, 'calculate'])->name('pos.calculate');
+
     });
+    Route::middleware(['auth', 'can:view settings'])->group(function () {
+        Route::get('/merchant/settings', [SettingController::class, 'index'])->name('merchant.settings');
+        Route::post('/merchant/settings', [SettingController::class, 'update'])->name('merchant.settings.update');
+    });
+
+    Route::middleware(['auth', 'can:view discounts'])->group(function () {
+    Route::get('/discounts', [DiscountController::class, 'index'])->name('merchant.discounts');
+    Route::post('/discounts', [DiscountController::class, 'store'])->name('merchant.store');
+    Route::patch('/discounts/{id}/toggle', [DiscountController::class, 'toggle'])->name('toggle');
+    Route::delete('/discounts/{id}', [DiscountController::class, 'destroy'])->name('destroy');
+});
 
     /*
     |--------------------------------------------------------------------------
@@ -124,7 +139,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::post('/pos/payment/create', [PaymentController::class, 'create'])->name('pos.payment.create');
+    Route::get('/pos/payment/success', [PaymentController::class, 'success'])->name('pos.payment.success');
+    Route::get('/pos/payment/cancel', [PaymentController::class, 'cancel'])->name('pos.cancel');
+
 });
+
 
 /*
 |--------------------------------------------------------------------------

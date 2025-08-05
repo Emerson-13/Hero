@@ -18,6 +18,10 @@ class Transaction extends Model
         'amount_paid',
         'total',
         'reference_number',
+        'subtotal',      
+        'discount',
+        'tax',   
+        'change'  
     ];
 
     public function merchant()
