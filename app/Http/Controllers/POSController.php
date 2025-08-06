@@ -43,7 +43,7 @@ class POSController extends Controller
         ]);
     }
 
-   public function store(Request $request)
+public function store(Request $request)
 {
     $validated = $request->validate([
         'customer_name' => 'nullable|string|max:255',
@@ -67,6 +67,9 @@ class POSController extends Controller
         ->first();
 
     $discountRate = $discount && $discount->type === 'percentage' ? ($discount->value / 100) : 0;
+    $discountValue = $discount && $discount->type === 'fixed' ? $discount->value : 0;
+    $discountType = $discount->discount_type ?? null; // 'gov' or 'promo'
+    $isGov = $discountType === 'gov';
     $appliesTo = $discount->applies_to ?? 'none';
     $targetIds = is_array($discount->target_ids)
         ? $discount->target_ids
@@ -100,8 +103,7 @@ class POSController extends Controller
             $subtotal += $lineSubtotal;
 
             $isDiscounted = false;
-
-            if ($discountRate > 0) {
+            if ($discount) {
                 if ($appliesTo === 'all') {
                     $isDiscounted = true;
                 } elseif ($appliesTo === 'categories' && in_array($product->category_id, $targetIds)) {
@@ -115,10 +117,25 @@ class POSController extends Controller
             $tax = 0;
 
             if ($isDiscounted) {
-                // No tax for discounted item
-                $discountAmount = $lineSubtotal * $discountRate;
+                if ($isGov) {
+                    // GOV: No VAT, discount from raw standard price
+                    $discountAmount = $discountRate > 0
+                        ? $lineSubtotal * $discountRate
+                        : $discountValue * $qty;
+                } else {
+                    // PROMO: Apply VAT first, then discount
+                    $vat = $lineSubtotal * 0.12;
+                    $tax += $vat;
+                    $gross = $lineSubtotal + $vat;
+
+                    $discountAmount = $discountRate > 0
+                        ? $gross * $discountRate
+                        : $discountValue * $qty;
+
+                    $totalTax += $tax;
+                }
             } else {
-                // 12% VAT for non-discounted item
+                // No discount, normal VAT
                 $tax = $lineSubtotal * 0.12;
                 $totalTax += $tax;
             }
@@ -161,6 +178,8 @@ class POSController extends Controller
     }
 }
 
+ 
+
 
     public function calculate(Request $request)
     {
@@ -174,77 +193,114 @@ class POSController extends Controller
         return response()->json($totals);
     }
 
-    private function computeTotals(array $items, $discountCode, $amountPaid, $merchantId)
-    {
-        $subtotal = 0;           // total price before any VAT or discount
-        $totalTax = 0;           // VAT only from non-discounted items
-        $totalDiscount = 0;      // discount amount from discounted items
+public function computeTotals(array $items, $discountCode, $amountPaid, $merchantId)
+{
+    $subtotal = 0;
+    $totalTax = 0;
+    $totalDiscount = 0;
+    $detailedItems = [];
 
-        $discount = \App\Models\Discount::where('merchant_id', $merchantId)
-            ->where('code', strtoupper(trim($discountCode)))
-            ->where('is_active', true)
-            ->first();
+    $discount = \App\Models\Discount::where('merchant_id', $merchantId)
+        ->where('code', strtoupper(trim($discountCode)))
+        ->where('is_active', true)
+        ->first();
 
-        $discountRate = 0;
-        $appliesTo = 'none';
-        $targetIds = [];
+    $discountRate = 0;
+    $discountValue = 0;
+    $discountType = null;
+    $appliesTo = 'none';
+    $targetIds = [];
+    $isGov = false;
 
+    if ($discount) {
+        $discountRate = $discount->type === 'percentage' ? ($discount->value / 100) : 0;
+        $discountValue = $discount->type === 'fixed' ? $discount->value : 0;
+        $discountType = $discount->discount_type;
+        $isGov = $discountType === 'gov';
+        $appliesTo = $discount->applies_to;
+        $targetIds = is_array($discount->target_ids)
+            ? $discount->target_ids
+            : json_decode($discount->target_ids, true) ?? [];
+    }
+
+    foreach ($items as $item) {
+        $productId = Arr::get($item, 'product_id');
+        $qty = Arr::get($item, 'quantity', 0);
+
+        if (!$productId || $qty <= 0) continue;
+
+        $product = Product::where('merchant_id', $merchantId)->find($productId);
+        if (!$product) continue;
+
+        $price = $product->price;
+        $lineSubtotal = $price * $qty;
+        $subtotal += $lineSubtotal;
+
+        $isDiscounted = false;
         if ($discount) {
-            $discountRate = $discount->type === 'percentage' ? ($discount->value / 100) : 0;
-            $appliesTo = $discount->applies_to;
-            $targetIds = is_array($discount->target_ids)
-                ? $discount->target_ids
-                : json_decode($discount->target_ids, true) ?? [];
+            if ($appliesTo === 'all') {
+                $isDiscounted = true;
+            } elseif ($appliesTo === 'categories' && in_array($product->category_id, $targetIds)) {
+                $isDiscounted = true;
+            } elseif ($appliesTo === 'products' && in_array($product->id, $targetIds)) {
+                $isDiscounted = true;
+            }
         }
 
-        foreach ($items as $item) {
-            $productId = Arr::get($item, 'product_id');
-            $qty = Arr::get($item, 'quantity', 0);
+        // Initialize values
+        $discountAmount = 0;
+        $vat = 0;
 
-            if (!$productId || $qty <= 0) continue;
-
-            $product = Product::where('merchant_id', $merchantId)->find($productId);
-            if (!$product) continue;
-
-            $price = $product->price; // standard price (no VAT)
-            $lineSubtotal = $price * $qty;
-            $subtotal += $lineSubtotal;
-
-            $isDiscounted = false;
-
-            if ($discountRate > 0) {
-                if ($appliesTo === 'all') {
-                    $isDiscounted = true;
-                } elseif ($appliesTo === 'categories' && in_array($product->category_id, $targetIds)) {
-                    $isDiscounted = true;
-                } elseif ($appliesTo === 'products' && in_array($product->id, $targetIds)) {
-                    $isDiscounted = true;
-                }
-            }
-
-            if ($isDiscounted) {
-                // Discounted items are VAT-exempt
-                $discountAmount = $lineSubtotal * $discountRate;
-                $totalDiscount += $discountAmount;
-                // No tax added
+        if ($isDiscounted) {
+            if ($isGov) {
+                $discountAmount = $discountRate > 0
+                    ? $lineSubtotal * $discountRate
+                    : $discountValue * $qty;
+                // GOV has no tax
             } else {
-                // Apply 12% VAT to non-discounted items
                 $vat = $lineSubtotal * 0.12;
-                $totalTax += $vat;
+                $gross = $lineSubtotal + $vat;
+
+                $discountAmount = $discountRate > 0
+                    ? $gross * $discountRate
+                    : $discountValue * $qty;
+
+                $totalTax += $vat; // ✅ Add tax here
             }
+
+            $totalDiscount += $discountAmount; // ✅ Always add discount
+        } else {
+            // No discount, normal VAT
+            $vat = $lineSubtotal * 0.12;
+            $totalTax += $vat; // ✅ Add tax
         }
 
-        $total = $subtotal + $totalTax - $totalDiscount;
-        $change = max($amountPaid - $total, 0);
-
-        return [
-            'subtotal' => round($subtotal, 2),
-            'discount' => round($totalDiscount, 2),
-            'tax' => round($totalTax, 2),
-            'total' => round($total, 2),
-            'change' => round($change, 2),
+        // Add to cart breakdown
+        $detailedItems[] = [
+            'product_id' => $product->id,
+            'quantity' => $qty,
+            'tax' => round($vat, 2),
+            'discount' => round($discountAmount, 2),
+            'line_total' => round($lineSubtotal + $vat - $discountAmount, 2),
         ];
     }
+
+    $total = $subtotal + $totalTax - $totalDiscount;
+    $change = max($amountPaid - $total, 0);
+
+    return [
+        'subtotal' => round($subtotal, 2),
+        'discount' => round($totalDiscount, 2),
+        'tax' => round($totalTax, 2),
+        'total' => round($total, 2),
+        'change' => round($change, 2),
+        'items' => $detailedItems,
+    ];
+}
+
+
+
+
 
 
 

@@ -32,14 +32,68 @@ export default function POS() {
             quantity: item.quantity,
         }));
 
+        if (items.length === 0) {
+            setTotals({
+                subtotal: 0,
+                discount: 0,
+                tax: 0,
+                total: 0,
+                change: 0,
+            });
+            return;
+        }
+
         axios.post(route('pos.calculate'), {
             items,
             discount_code: discountCode,
             amount_paid: parseFloat(data.amount_paid) || 0,
         })
-        .then(res => setTotals(res.data))
-        .catch(() => setTotals({ subtotal: 0, discount: 0, tax: 0, total: 0, change: 0 }));
-    }, [cart, discountCode, data.amount_paid]);
+        .then(res => {
+            setTotals({
+                subtotal: res.data.subtotal || 0,
+                discount: res.data.discount || 0,
+                tax: res.data.tax || 0,
+                total: res.data.total || 0,
+                change: res.data.change || 0,
+            });
+
+            // ✅ Safely update cart with returned item details
+            if (Array.isArray(res.data.items)) {
+                setCart(prevCart =>
+                    prevCart.map(item => {
+                        const matched = res.data.items.find(i => i.product_id === item.id);
+                        if (!matched) return item;
+
+                        const qty = item.quantity;
+                        const price = Number(item.price);
+                        const tax = matched.tax || 0;
+                        const discount = matched.discount || 0;
+                        const lineTotal = qty * price + tax - discount;
+
+                        return {
+                            ...item,
+                            tax,
+                            discount,
+                            lineTotal,
+                        };
+                    })
+                );
+            }
+        })
+        .catch(() => {
+            setTotals({
+                subtotal: 0,
+                discount: 0,
+                tax: 0,
+                total: 0,
+                change: 0,
+            });
+        });
+    }, [
+        JSON.stringify(cart.map(({ id, quantity }) => ({ id, quantity }))),
+        discountCode,
+        data.amount_paid
+    ]);
 
     const addToCart = (product) => {
         const existing = cart.find(item => item.id === product.id);
@@ -52,6 +106,10 @@ export default function POS() {
         } else {
             setCart([...cart, { ...product, quantity: 1 }]);
         }
+    };
+    
+    const removeFromCart = (id) => {
+        setCart(cart.filter(item => item.id !== id));
     };
 
     const updateQuantity = (id, quantity) => {
@@ -101,149 +159,192 @@ export default function POS() {
             <div className="py-12">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div className="bg-white p-6 shadow-sm sm:rounded-lg">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* LEFT: Product List */}
-                            <div className="lg:col-span-2">
-                                <h3 className="text-lg font-bold mb-4">Product List</h3>
+                       <h2 className="text-3xl font-bold text-center text-gray-800 mb-2">🛒 Point of Sale Dashboard</h2>
+                            <p className="text-center text-gray-600 mb-6">
+                                Manage product sales, transactions, and discounts in one place.
+                            </p>
+                           <div className="bg-gray-50 p-6 rounded-lg shadow-sm border mb-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* LEFT: Product List */}
+                                    <div className="lg:col-span-2">
+                                        <h3 className="text-lg font-bold mb-4">Product List</h3>
 
-                                <div className="mb-4 flex items-center gap-4">
-                                    <label className="font-medium">Filter by Category:</label>
-                                    <select
-                                        className="border p-2 rounded"
-                                        value={selectedCategory}
-                                        onChange={changeCategory}
-                                    >
-                                        <option value="all">All</option>
-                                        {categories.map(category => (
-                                            <option key={category.id} value={category.id}>{category.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    {products.data.map(product => (
-                                        <div key={product.id} className="p-4 border rounded shadow-sm">
-                                            <h4 className="font-bold">{product.name}</h4>
-                                            <p>{product.description}</p>
-                                            <p className="text-green-600">₱{product.price}</p>
-                                            <PrimaryButton onClick={() => addToCart(product)} className="mt-2">Add</PrimaryButton>
+                                        <div className="mb-4 flex items-center gap-4">
+                                            <label className="font-medium">Filter by Category:</label>
+                                            <select
+                                                className="border p-2 rounded"
+                                                value={selectedCategory}
+                                                onChange={changeCategory}
+                                            >
+                                                <option value="all">All</option>
+                                                {categories.map(category => (
+                                                    <option key={category.id} value={category.id}>{category.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                    ))}
-                                </div>
 
-                                <div className="mt-6">
-                                    <Pagination
-                                        links={products.links}
-                                        preserveScroll
-                                        preserveState
-                                        data={{ category: selectedCategory }}
-                                    />
-                                </div>
-                            </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {products.data.map(product => (
+                                                <div key={product.id} className="p-4 border rounded shadow-sm">
+                                                    <h4 className="font-bold">{product.name}</h4>
+                                                    <p>{product.description}</p>
+                                                    <p className="text-green-600">₱{product.price}</p>
+                                                    <PrimaryButton onClick={() => addToCart(product)} className="mt-2">Add</PrimaryButton>
+                                                </div>
+                                            ))}
+                                        </div>
 
-                            {/* RIGHT: Cart & Checkout */}
-                            <div className="lg:col-span-1 border-l border-gray-300 pl-6">
-                                <h3 className="text-lg font-bold mb-4">Cart</h3>
+                                        <div className="mt-6">
+                                            <Pagination
+                                                links={products.links}
+                                                preserveScroll
+                                                preserveState
+                                                data={{ category: selectedCategory }}
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="mt-2 max-h-48 overflow-y-auto border rounded">
-                                    <table className="w-full text-sm">
-                                        <thead className="sticky top-0 bg-white">
-                                            <tr>
-                                                <th className="text-left px-2 py-1">Name</th>
-                                                <th className="text-left px-2 py-1">Qty</th>
-                                                <th className="text-left px-2 py-1">Subtotal</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {cart.map(item => (
-                                                <tr key={item.id}>
-                                                    <td className="px-2 py-1">{item.name}</td>
-                                                    <td className="px-2 py-1">
-                                                        <input
+                                    {/* RIGHT: Cart & Checkout */}
+                                    <div className="lg:col-span-1 border-l border-gray-300 pl-6">
+                                        <h3 className="text-lg font-bold mb-4">Cart</h3>
+
+                                        <div className="mt-2 max-h-48 overflow-y-auto border rounded">
+                                            <table className="w-full text-sm">
+                                                <thead className="sticky top-0 bg-white">
+                                                    <tr>
+                                                        <th className="text-left px-2 py-1">Name</th>
+                                                        <th className="text-left px-2 py-1">Qty</th>
+                                                        <th className="text-left px-2 py-1">Price</th>
+                                                        <th className="text-left px-2 py-1">action</th>
+                                                    </tr>
+                                                </thead>
+                                            <tbody>
+                                                    {cart.map(item => (
+                                                        <tr key={item.id}>
+                                                        <td className="px-2 py-1">{item.name}
+                                                        </td>
+                                                        <td className="px-2 py-1">
+                                                            <input
                                                             type="number"
                                                             value={item.quantity}
                                                             min="1"
                                                             onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
                                                             className="w-16 text-center"
-                                                        />
-                                                    </td>
-                                                    <td className="px-2 py-1">₱{item.quantity * item.price}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                            />
+                                                        </td>
+                                                        <td className="px-2 py-1">
+                                                            <div>
+                                                            {item.quantity} x ₱{Number(item.price).toFixed(2)}
+                                                            </div>
+                                                            {item.discount > 0 && (
+                                                            <div className="text-green-600 text-xs">Disc: -₱{Number(item.discount).toFixed(2)}</div>
+                                                            )}
+                                                            {item.tax > 0 && (
+                                                            <div className="text-blue-600 text-xs">Tax: +₱{Number(item.tax).toFixed(2)}</div>
+                                                            )}
+                                                            <div className="font-semibold">
+                                                            Total: ₱{Number(item.lineTotal ?? item.quantity * item.price).toFixed(2)}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-2 py-1">
+                                                            <button
+                                                                onClick={() => removeFromCart(item.id)}
+                                                                className="ml-2 text-red-500 text-xs hover:underline"
+                                                                title="Remove from cart"
+                                                            >
+                                                                <svg
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                    className="w-4 h-4 inline text-red-500 hover:text-red-700 cursor-pointer"
+                                                                    viewBox="0 0 24 24"
+                                                                    fill="currentColor"
+                                                                >
+                                                                    <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                                    <path
+                                                                        d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="2"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                    />
+                                                                    <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                                </svg>
+                                                            </button>
+                                                        </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
 
-                                {/* Discount Approval Section */}
-                                <div className="mt-4 space-y-2">
-                                    <label className="block text-sm font-medium">Manager Approval Code</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter approval code"
-                                        value={discountCode}
-                                        onChange={(e) => setDiscountCode(e.target.value)}
-                                        className="border p-2 rounded block w-full"
-                                    />
-                                    <p className="text-xs text-gray-500">Required for PWD/Senior discount if enabled by admin.</p>
-                               {totals.discount > 0 && (
-  <p className="text-green-600 text-sm">✅ Discount code applied: -₱{totals.discount.toFixed(2)}</p>
-)}
+                                        {/* Discount Approval Section */}
+                                        <div className="mt-4 space-y-2">
+                                            <label className="block text-sm font-medium">Manager Approval Code</label>
+                                            <input
+                                                type="password"
+                                                placeholder="Enter approval code"
+                                                value={discountCode}
+                                                onChange={(e) => setDiscountCode(e.target.value)}
+                                                className="border p-2 rounded block w-full"
+                                            />
+                                            <p className="text-xs text-gray-500">Required for Gov/Promo discount if enabled by Merchant.</p>
+                                            {totals.discount > 0 && (
+                                                <p className="text-green-600 text-sm">✅ Discount code applied: -₱{totals.discount.toFixed(2)}</p>
+                                                )}
+                                            {discountCode && totals.discount === 0 && (
+                                                <p className="text-red-600 text-sm">❌ Invalid discount code or not allowed</p>
+                                            )}
+                                        </div>
+                                        
 
-                                    {discountCode && totals.discount === 0 && (
-                                        <p className="text-red-600 text-sm">❌ Invalid discount code or not allowed</p>
-                                    )}
-                                 </div>
-                                 
+                                        {/* Customer Info */}
+                                        <div className="mt-4 space-y-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Customer Name"
+                                                value={data.customer_name}
+                                                onChange={(e) => setData('customer_name', e.target.value)}
+                                                className="border p-2 rounded block w-full"
+                                            />
+                                            <select
+                                                value={data.payment_method}
+                                                onChange={(e) => setData('payment_method', e.target.value)}
+                                                className="border p-2 rounded block w-full"
+                                            >
+                                                <option value="cash">Cash</option>
+                                                <option value="online">Online</option>
+                                            </select>
+                                            <input
+                                                type="number"
+                                                placeholder="Amount Paid"
+                                                value={data.amount_paid}
+                                                onChange={(e) => setData('amount_paid', parseFloat(e.target.value))}
+                                                className="border p-2 rounded block w-full"
+                                            />
+                                        </div>
 
-                                {/* Customer Info */}
-                                <div className="mt-4 space-y-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Customer Name"
-                                        value={data.customer_name}
-                                        onChange={(e) => setData('customer_name', e.target.value)}
-                                        className="border p-2 rounded block w-full"
-                                    />
-                                    <select
-                                        value={data.payment_method}
-                                        onChange={(e) => setData('payment_method', e.target.value)}
-                                        className="border p-2 rounded block w-full"
+                                        {/* Computed Totals */}
+                                        <div className="mt-4 text-sm text-right space-y-1 font-medium border-t pt-3">
+                                        {cart.length > 0 ? (
+                                            <div className="text-right space-y-1 mt-4 text-sm">
+                                                <p>Subtotal: ₱{totals.subtotal.toFixed(2)}</p>
+                                                <p>Discount: ₱{totals.discount.toFixed(2)}</p>
+                                                <p>Tax: ₱{totals.tax.toFixed(2)}</p>
+                                                <p className="font-semibold">Total: ₱{totals.total.toFixed(2)}</p>
+                                                <p className="font-medium">Change: ₱{totals.change.toFixed(2)}</p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-500">Cart is empty.</p>
+                                        )}
+                                    </div>
+
+                                    <PrimaryButton
+                                        onClick={handleSubmit}
+                                        className="mt-4 w-full"
+                                        disabled={!cart.length || (totals?.total > data.amount_paid)}
                                     >
-                                        <option value="cash">Cash</option>
-                                        <option value="online">Online</option>
-                                    </select>
-                                    <input
-                                        type="number"
-                                        placeholder="Amount Paid"
-                                        value={data.amount_paid}
-                                        onChange={(e) => setData('amount_paid', parseFloat(e.target.value))}
-                                        className="border p-2 rounded block w-full"
-                                    />
+                                        Complete Sale
+                                    </PrimaryButton>
                                 </div>
-
-                                {/* Computed Totals */}
-                                <div className="mt-4 text-sm text-right space-y-1 font-medium border-t pt-3">
-                                   {cart.length > 0 ? (
-    <div className="text-right space-y-1 mt-4 text-sm">
-        <p>Subtotal: ₱{totals.subtotal.toFixed(2)}</p>
-        <p>Discount: ₱{totals.discount.toFixed(2)}</p>
-        <p>Tax: ₱{totals.tax.toFixed(2)}</p>
-        <p className="font-semibold">Total: ₱{totals.total.toFixed(2)}</p>
-        <p className="font-medium">Change: ₱{totals.change.toFixed(2)}</p>
-    </div>
-) : (
-    <p className="text-gray-500">Cart is empty.</p>
-)}
-
-                                </div>
-
-                                <PrimaryButton
-                                    onClick={handleSubmit}
-                                    className="mt-4 w-full"
-                                  disabled={!cart.length || (totals?.total > data.amount_paid)}
-                                >
-                                    Complete Sale
-                                </PrimaryButton>
                             </div>
                         </div>
                     </div>

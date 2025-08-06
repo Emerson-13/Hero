@@ -1,13 +1,18 @@
 import { useForm, usePage, router, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PrimaryButton from '@/Components/PrimaryButton';
 import DangerButton from '@/Components/DangerButton';
 import Select from 'react-select';
+import SecondaryButton from '@/Components/SecondaryButton';
+import DiscountsEdit from './DiscountsEdit'; 
 
 export default function Discounts() {
     const { discounts = [], categories = [], products = [] } = usePage().props;
     const categoryOptions = categories.map(cat => ({ value: cat.id, label: cat.name }));
 const productOptions = products.map(prod => ({ value: prod.id, label: prod.name }));
+const [editingDiscount, setEditingDiscount] = useState(null);
+const [showEditModal, setShowEditModal] = useState(false);
 
 
     const { data, setData, reset, post } = useForm({
@@ -21,19 +26,20 @@ const productOptions = products.map(prod => ({ value: prod.id, label: prod.name 
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('merchant.store'), {
+        console.log(data);  
+        post(route('discount.store'), {
             preserveScroll: true,
             onSuccess: () => reset(),
         });
     };
 
     const toggleStatus = (id) => {
-        router.patch(route('toggle', id));
+        router.patch(route('discount.toggle', id));
     };
 
     const deleteDiscount = (id) => {
         if (confirm('Are you sure you want to delete this discount?')) {
-            router.delete(route('destroy', id));
+            router.delete(route('discount.destroy', id));
         }
     };
 
@@ -81,118 +87,163 @@ const productOptions = products.map(prod => ({ value: prod.id, label: prod.name 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold">Manage Discounts</h2>}>
             <Head title="Discounts" />
+             <div className="py-12">
+                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <div className="bg-white p-6 rounded-lg shadow-sm border">
+                        <h3 className="text-3xl font-bold text-center text-gray-800 mb-2">📃 Discounts Panel</h3>
+                            <p className="text-center text-gray-600 mb-6">
+                                Manage and organize discounts and deals in your system.
+                            </p>
+                            {/* Create Discount Form */}
+                            <div className="bg-gray-50 p-6 rounded-lg shadow-sm border mb-6">
+                                <h3 className="text-2xl font-semibold text-gray-800 mb-4">➕ Add Discount</h3>
+                                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="col-span-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. SAVE10"
+                                            className="w-full border rounded p-2"
+                                            value={data.code}
+                                            onChange={(e) => setData('code', e.target.value.toUpperCase())}
+                                            required
+                                        />
+                                    </div>
 
-            <div className="p-6">
-                {/* Create Discount Form */}
-                <div className="bg-white p-4 rounded shadow-sm max-w-md mb-6">
-                    <h3 className="font-bold mb-3">Add Discount</h3>
-                    <form onSubmit={handleSubmit} className="space-y-3">
-                        <input
-                            type="text"
-                            placeholder="Code (e.g. SAVE10)"
-                            className="w-full border rounded p-2"
-                            value={data.code}
-                            onChange={(e) => setData('code', e.target.value.toUpperCase())}
-                            required
-                        />
+                                    <div className="col-span-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                        <select
+                                            className="w-full border rounded p-2"
+                                            value={data.type}
+                                            onChange={(e) => setData('type', e.target.value)}
+                                        >
+                                            <option value="percentage">Percentage (%)</option>
+                                            <option value="fixed">Fixed (₱)</option>
+                                        </select>
+                                    </div>
 
-                        <select
-                            className="w-full border rounded p-2"
-                            value={data.type}
-                            onChange={(e) => setData('type', e.target.value)}
-                        >
-                            <option value="percentage">Percentage (%)</option>
-                            <option value="fixed">Fixed (₱)</option>
-                        </select>
+                                    <div className="col-span-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 10"
+                                            className="w-full border rounded p-2"
+                                            value={data.value}
+                                            onChange={(e) => setData('value', e.target.value)}
+                                            required
+                                        />
+                                    </div>
 
-                        <input
-                            type="number"
-                            placeholder="Value (e.g. 10)"
-                            className="w-full border rounded p-2"
-                            value={data.value}
-                            onChange={(e) => setData('value', e.target.value)}
-                            required
-                        />
+                                    <div className="col-span-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount Type</label>
+                                        <select
+                                            className="w-full border rounded p-2"
+                                            value={data.discount_type}
+                                            onChange={(e) => setData('discount_type', e.target.value)}
+                                        >
+                                            <option value="promo">Promo</option>
+                                            <option value="gov">Gov (PWD/Senior)</option>
+                                        </select>
+                                    </div>
 
-                        <select
-                            className="w-full border rounded p-2"
-                            value={data.discount_type}
-                            onChange={(e) => setData('discount_type', e.target.value)}
-                        >
-                            <option value="promo">Promo</option>
-                            <option value="gov">Gov (PWD/Senior)</option>
-                        </select>
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Applies To</label>
+                                        <select
+                                            className="w-full border rounded p-2"
+                                            value={data.applies_to}
+                                            onChange={(e) => {
+                                                setData('applies_to', e.target.value);
+                                                setData('target_ids', []);
+                                            }}
+                                        >
+                                            <option value="all">All Items</option>
+                                            <option value="categories">Specific Categories</option>
+                                            <option value="products">Specific Products</option>
+                                        </select>
+                                    </div>
 
-                        <select
-                            className="w-full border rounded p-2"
-                            value={data.applies_to}
-                            onChange={(e) => {
-                                setData('applies_to', e.target.value);
-                                setData('target_ids', []);
-                            }}
-                        >
-                            <option value="all">All Items</option>
-                            <option value="categories">Specific Categories</option>
-                            <option value="products">Specific Products</option>
-                        </select>
+                                    {/* Conditionally Render Category/Product Select */}
+                                    <div className="col-span-2">{renderTargetSelector()}</div>
 
-                        {/* Render Target Selector */}
-                        {renderTargetSelector()}
-
-                        <PrimaryButton type="submit">Create Discount</PrimaryButton>
-                    </form>
+                                    <div className="col-span-2 flex justify-end pt-4">
+                                        <PrimaryButton type="submit">Create Discount</PrimaryButton>
+                                    </div>
+                                </form>
+                            </div>           
+                            <div className="overflow-x-auto shadow-sm rounded-lg">
+                                <table className="w-full text-sm border border-gray-300">
+                                    <thead className="bg-gray-100 text-left">
+                                        <tr>
+                                            <th className="border px-3 py-2">Code</th>
+                                            <th className="border px-3 py-2">Type</th>
+                                            <th className="border px-3 py-2">Discount Type</th>
+                                            <th className="border px-3 py-2">Value</th>
+                                            <th className="border px-3 py-2">Scope</th>
+                                            <th className="border px-3 py-2">Status</th>
+                                            <th className="border px-3 py-2 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {discounts.length ? (
+                                            discounts.map((discount) => (
+                                                <tr key={discount.id} className="hover:bg-gray-50 transition">
+                                                    <td className="border px-3 py-2">{discount.code}</td>
+                                                    <td className="border px-3 py-2 capitalize">{discount.type}</td>
+                                                    <td className="border px-3 py-2 capitalize">{discount.discount_type}</td>
+                                                    <td className="border px-3 py-2">
+                                                        {discount.type === 'percentage' ? `${discount.value}%` : `₱${discount.value}`}
+                                                    </td>
+                                                    <td className="border px-3 py-2 capitalize">{discount.applies_to}</td>
+                                                    <td className="border px-3 py-2">
+                                                        <span className={discount.is_active ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                                            {discount.is_active ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="border px-3 py-2 flex flex-wrap gap-2 justify-center">
+                                                        <SecondaryButton onClick={() => toggleStatus(discount.id)}>
+                                                            {discount.is_active ? 'Deactivate' : 'Activate'}
+                                                        </SecondaryButton>
+                                                        <PrimaryButton onClick={() => {
+                                                            setEditingDiscount(discount);
+                                                            setShowEditModal(true);
+                                                        }}>
+                                                            Edit
+                                                        </PrimaryButton>
+                                                        <DangerButton onClick={() => deleteDiscount(discount.id)}>
+                                                            Delete
+                                                        </DangerButton>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="7" className="text-center py-4 text-gray-500">
+                                                    No discounts found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                {/* Discount List Table */}
-                <div className="bg-white p-4 rounded shadow-sm">
-                    <h3 className="font-bold mb-3">Existing Discounts</h3>
-                    <table className="w-full text-sm border border-gray-300">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th className="border px-3 py-2">Code</th>
-                                <th className="border px-3 py-2">Type</th>
-                                <th className="border px-3 py-2">Value</th>
-                                <th className="border px-3 py-2">Scope</th>
-                                <th className="border px-3 py-2">Status</th>
-                                <th className="border px-3 py-2">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {discounts.length ? (
-                                discounts.map((d) => (
-                                    <tr key={d.id}>
-                                        <td className="border px-3 py-2">{d.code}</td>
-                                        <td className="border px-3 py-2">{d.type}</td>
-                                        <td className="border px-3 py-2">
-                                            {d.type === 'percentage' ? `${d.value}%` : `₱${d.value}`}
-                                        </td>
-                                        <td className="border px-3 py-2 capitalize">{d.applies_to}</td>
-                                        <td className="border px-3 py-2">
-                                            <span className={d.is_active ? 'text-green-600' : 'text-red-600'}>
-                                                {d.is_active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </td>
-                                        <td className="border px-3 py-2 space-x-2">
-                                            <PrimaryButton onClick={() => toggleStatus(d.id)}>
-                                                {d.is_active ? 'Deactivate' : 'Activate'}
-                                            </PrimaryButton>
-                                            <DangerButton onClick={() => deleteDiscount(d.id)}>
-                                                Delete
-                                            </DangerButton>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="6" className="text-center py-3 text-gray-500">
-                                        No discounts found.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                {showEditModal && editingDiscount && (
+                    <DiscountsEdit
+                        discount={editingDiscount}
+                        categories={categories}
+                        products={products}
+                        onClose={() => {
+                        setShowEditModal(false);
+                        setEditingDiscount(null);
+                        }}
+                        onUpdated={() => {
+                            setShowEditModal(false);
+                            setEditingDiscount(null);
+                            router.reload();
+                        }}
+                    />
+                )}
         </AuthenticatedLayout>
     );
 }

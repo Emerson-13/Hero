@@ -7,6 +7,9 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -74,4 +77,54 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Product deleted successfully.');
     }
+
+ public function exportProductsCsv(Request $request)
+{
+    $categoryIds = $request->input('category_id'); // Expecting array of IDs
+
+    // Ensure it's always an array (in case of single value passed)
+    if (!is_array($categoryIds) && $categoryIds !== null) {
+        $categoryIds = [$categoryIds];
+    }
+
+    // Fetch products with optional category filtering
+    $products = Product::with('category')
+        ->when(!empty($categoryIds), function ($query) use ($categoryIds) {
+            $query->whereIn('category_id', $categoryIds);
+        })
+        ->get();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    // Set column headers
+    $sheet->fromArray([
+        ['Category', 'Name', 'Description', 'Price', 'Stock']
+    ]);
+
+    // Fill in product rows
+    $rowIndex = 2;
+    foreach ($products as $product) {
+        $sheet->fromArray([
+            [
+                $product->category->name ?? 'Uncategorized',
+                $product->name,
+                $product->description,
+                $product->price,
+                $product->stock,
+            ]
+        ], null, 'A' . $rowIndex++);
+    }
+
+    $filename = 'products_' . now()->format('Ymd_His') . '.xlsx';
+
+    return new StreamedResponse(function () use ($spreadsheet) {
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+    }, 200, [
+        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition' => "attachment; filename=\"$filename\"",
+        'Cache-Control' => 'max-age=0',
+    ]);
+}
 }

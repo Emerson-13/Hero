@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CategoryController extends Controller
 {
@@ -73,4 +76,37 @@ class CategoryController extends Controller
 
          return redirect()->back()->with('success', 'Category deleted.');
     }
+
+
+    public function exportCsv()
+    {
+        $categories = Category::latest()->get();
+
+        $filename = 'categories_' . now()->format('Ymd_His') . '.csv';
+
+        $headers = [
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=$filename",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ];
+
+        $callback = function () use ($categories) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Name', 'Description']);
+
+            foreach ($categories as $category) {
+                fputcsv($handle, [
+                    $category->name,
+                    $category->description,
+                ]);
+            }
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
 }

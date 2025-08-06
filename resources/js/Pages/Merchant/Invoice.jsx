@@ -45,7 +45,7 @@ export default function Invoice() {
                             <span>{item.quantity} x ₱{Number(item.price).toFixed(2)}</span>
                             <div className="text-right space-x-2">
                                 {Number(item.discount) > 0 && (
-                                    <span className="text-red-600">Disc: ₱{Number(item.discount).toFixed(2)}</span>
+                                    <span className="text-green-600">Disc: ₱{Number(item.discount).toFixed(2)}</span>
                                 )}
                                 <span>Tax: ₱{Number(item.tax).toFixed(2)}</span>
                             </div>
@@ -64,7 +64,7 @@ export default function Invoice() {
                 </div>
                 <div className="flex justify-between">
                     <span>Total Discount</span>
-                    <span className="text-red-600">-₱{discount.toFixed(2)}</span>
+                    <span className="text-greeb-600">-₱{discount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span>Total Tax</span>

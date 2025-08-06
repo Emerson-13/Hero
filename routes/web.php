@@ -83,6 +83,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+   Route::get('/products/export', [ProductController::class, 'exportProductsCsv'])->name('export.products.csv');
+
+
     });
 
 
@@ -91,14 +94,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
         Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        Route::get('/categories/export', [CategoryController::class, 'exportCsv'])->name('export.categories.csv');
+
     });
 
     Route::middleware('auth','can:view sales')->group(function () {
         Route::get('/merchant/sales', [SalesController::class, 'index'])->name('merchant.sales');
+        Route::get('/export/sales-csv', [SalesController::class, 'exportSalesExcel'])->name('export.sales.csv');
     });
 
     Route::middleware('auth','can:view transactions')->group(function () {
          Route::get('/merchant/transactions', [TransactionController::class, 'index'])->name('merchant.transactions');
+         Route::get('/export/transactions-csv', [TransactionController::class, 'exportTransactionsExcel'])->name('export.transactions.csv');
     });
 
     Route::middleware('auth', 'can:view pos')->group(function () {
@@ -116,9 +123,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['auth', 'can:view discounts'])->group(function () {
     Route::get('/discounts', [DiscountController::class, 'index'])->name('merchant.discounts');
-    Route::post('/discounts', [DiscountController::class, 'store'])->name('merchant.store');
-    Route::patch('/discounts/{id}/toggle', [DiscountController::class, 'toggle'])->name('toggle');
-    Route::delete('/discounts/{id}', [DiscountController::class, 'destroy'])->name('destroy');
+    Route::post('/discounts', [DiscountController::class, 'store'])->name('discount.store');
+    Route::patch('/discounts/{discount}/toggle', [DiscountController::class, 'toggle'])->name('discount.toggle');
+       Route::put('/discounts/{discount}', [DiscountController::class, 'update'])->name('discount.update');
+    Route::delete('/discounts/{discount}', [DiscountController::class, 'destroy'])->name('discount.destroy');
 });
 
     /*
