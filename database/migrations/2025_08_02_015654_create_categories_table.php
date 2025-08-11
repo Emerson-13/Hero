@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('merchant_id');
             $table->string('name');
-            $table->string('description');
+            $table->string('description')->nullable();
             $table->boolean('is_discountable')->default(false);
             $table->timestamps();
             $table->foreign('merchant_id')

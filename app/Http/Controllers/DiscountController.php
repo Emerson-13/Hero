@@ -23,7 +23,7 @@ class DiscountController extends Controller
         $categories = Category::where('merchant_id', $merchantId)->get();
         $products = Product::where('merchant_id', $merchantId)->get();
 
-        return Inertia::render('Merchant/Discounts', [
+        return Inertia::render('MerchantSetting/Discounts', [
             'discounts' => $discounts,
             'categories' => $categories,
             'products' => $products,

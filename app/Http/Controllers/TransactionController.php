@@ -22,7 +22,8 @@ class TransactionController extends Controller
         'transaction' => $transaction,
         ]);
     }
-       public function exportTransactionsExcel()
+    
+    public function exportTransactionsExcel()
     {
         $transactions = Transaction::latest()->get();
 

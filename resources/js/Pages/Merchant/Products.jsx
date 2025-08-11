@@ -8,18 +8,21 @@ import InputError from '@/Components/InputError';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
 import ProductEdit from './ProductEdit'
 import Select from 'react-select';
+import UploadProductModal from '@/Modal/UploadProductModal';
 
 
 export default function Products() {
     const { products = [],  categories = []} = usePage().props;
     const categoryOptions = categories.map(cat => ({ value: cat.id, label: cat.name }));
     const [showModal, setShowModal] = useState(false);
+        const [showUploadModal, setShowUploadModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedCategories, setSelectedCategories] = useState([]);
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         description: '',
+        barcode:'',
         price: '',
         stock: '',
         category_id: '',
@@ -29,12 +32,13 @@ export default function Products() {
     
        const filteredProduct = useMemo(() => {
         return products.filter((product) => {
-            const Product = products?.name?.toLowerCase() ?? '';
+            const Product = product?.name?.toLowerCase() ?? '';
+            const Barcode = product?.barcode?.toLowerCase() ?? '';
             const Description = product?.description?.toLowerCase() ?? '';
             const Price = product?.price?.toLowerCase() ?? '';
             const query = search.toLowerCase();
     
-            return Product.includes(query) || Description.includes(query) || Price.includes(query);
+            return Product.includes(query) || Description.includes(query) || Barcode.includes(query) || Price.includes(query);
         });
         }, [search, products]);     
 
@@ -88,6 +92,12 @@ export default function Products() {
                                                 Add a new product with details such as category, stock, and price.
                                             </p>
                                         </div>
+                                         <PrimaryButton
+                                            onClick={() => setShowUploadModal(true)}
+                                            className="bg-green-600 text-white rounded hover:bg-green-700"
+                                        >
+                                            Upload Products
+                                        </PrimaryButton>
                                         <PrimaryButton
                                             onClick={() => setShowModal(true)}
                                             className="bg-blue-600 hover:bg-blue-700 self-start"
@@ -150,6 +160,19 @@ export default function Products() {
                                                         required
                                                     />
                                                 <InputError message={errors.name} className="mt-2" />
+                                            </div>
+                                             <div className="mt-4">
+                                                <InputLabel htmlFor="barcode" value="Barcode" />
+                                                    <TextInput
+                                                        id="barcode"
+                                                        type="text"
+                                                        name="barcode"
+                                                        value={data.barcode}
+                                                        className="mt-1 block w-full"
+                                                        onChange={(e) => setData('barcode', e.target.value)}
+                                                        required
+                                                    />
+                                                <InputError message={errors.description} className="mt-2" />
                                             </div>
                                             
                                             <div className="mt-4">
@@ -243,6 +266,7 @@ export default function Products() {
                                             <th className="border px-4 py-2">#</th>
                                             <th className="border px-4 py-2">Category Name</th>
                                             <th className="border px-4 py-2">Name</th>
+                                            <th className="border px-4 py-2">Barcode</th>
                                             <th className="border px-4 py-2">description</th>
                                             <th className="border px-4 py-2">Price</th>
                                             <th className="border px-4 py-2">stock</th>
@@ -257,6 +281,7 @@ export default function Products() {
                                                     <td className="border px-4 py-2">{index + 1}</td>
                                                     <td className="border px-4 py-2">{product.category?.name || 'Uncategorized'}</td>
                                                     <td className="border px-4 py-2">{product.name}</td>
+                                                    <td className="border px-4 py-2">{product.barcode}</td>
                                                     <td className="border px-4 py-2">{product.description}</td>
                                                     <td className="border px-4 py-2">₱{Number(product.price).toFixed(2)}</td>
                                                     <td className="border px-4 py-2">{Number(product.stock).toFixed(2)}</td>
@@ -289,6 +314,10 @@ export default function Products() {
                             </div>
                         </div>
                     </div>
+                     <UploadProductModal
+                show={showUploadModal}
+                onClose={() => setShowUploadModal(false)}
+            />
                 </div>
                 {/* Edit Modal */}
                 {showEditModal && editingProduct && (
@@ -301,6 +330,8 @@ export default function Products() {
                     }}
                     onUpdated={() => router.reload()}
                 />
+                
+                
             )}
         </AuthenticatedLayout>
     );

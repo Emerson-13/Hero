@@ -16,7 +16,10 @@ export default function UpdateProfileInformation({
         useForm({
             name: user.name,
             email: user.email,
-        });
+            company_name: user.company_name ?? '',
+            address: user.address ?? '',
+        })
+
 
     const submit = (e) => {
         e.preventDefault();
@@ -67,6 +70,25 @@ export default function UpdateProfileInformation({
                     />
 
                     <InputError className="mt-2" message={errors.email} />
+                </div>
+                <div>
+                    <InputLabel htmlFor="company_name" value="Company Name"/>
+                    <TextInput
+                        type="text"
+                        name="company_name"
+                        value={data.company_name}
+                        onChange={e => setData('company_name', e.target.value)}
+                    />
+                    <InputError className="mt-2" message={errors.company_name} />
+                </div>
+                <div>
+                <InputLabel htmlFor="address" value="Address"/>
+                <textarea
+                    name="address"
+                    value={data.address}
+                    onChange={e => setData('address', e.target.value)}
+                />
+                <InputError className="mt-2" message={errors.address} />
                 </div>
 
                 {mustVerifyEmail && user.email_verified_at === null && (

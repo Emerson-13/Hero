@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Imports\ProductImport;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProductController extends Controller
 {
@@ -81,7 +84,7 @@ class ProductController extends Controller
  public function exportProductsCsv(Request $request)
 {
     $categoryIds = $request->input('category_id'); // Expecting array of IDs
-
+  
     // Ensure it's always an array (in case of single value passed)
     if (!is_array($categoryIds) && $categoryIds !== null) {
         $categoryIds = [$categoryIds];
@@ -127,4 +130,77 @@ class ProductController extends Controller
         'Cache-Control' => 'max-age=0',
     ]);
 }
+
+
+public function upload(Request $request)
+{
+    $request->validate([
+        'file' => 'required|file|mimes:xlsx,xls',
+    ]);
+
+    $file = $request->file('file');
+    $spreadsheet = IOFactory::load($file->getPathname());
+    $sheet = $spreadsheet->getActiveSheet();
+    $rows = $sheet->toArray();
+
+    // Remove header row
+    unset($rows[0]);
+
+    $merchantId = Auth::id();
+
+    foreach ($rows as $row) {
+        $name = $row[0] ?? null;
+        $price = $row[1] ?? null;
+        $barcode = $row[2] ?? null;
+        $categoryName = $row[3] ?? null;
+        $stock = $row[4] ?? 0;
+        $description = $row[5] ?? null;
+
+        // Validate essential fields
+        if (!$name || !$price || !$categoryName) {
+            continue;
+        }
+
+        // Create or find category with merchant_id
+        $category = Category::firstOrCreate(
+            [
+                'name' => $categoryName,
+                'merchant_id' => $merchantId
+            ]
+        );
+
+        // Generate barcode if not provided
+        if (!$barcode) {
+            $barcode = 'BC-' . strtoupper(Str::random(8));
+        }
+
+        // Check if product exists
+        $existingProduct = Product::where('name', $name)
+            ->where('category_id', $category->id)
+            ->where('merchant_id', $merchantId)
+            ->first();
+
+        if ($existingProduct) {
+            $existingProduct->update([
+                'price' => $price,
+                'barcode' => $barcode,
+                'stock' => $stock,
+                'description' => $description,
+            ]);
+        } else {
+            Product::create([
+                'name' => $name,
+                'price' => $price,
+                'barcode' => $barcode,
+                'stock' => $stock,
+                'description' => $description,
+                'category_id' => $category->id,
+                'merchant_id' => $merchantId,
+            ]);
+        }
+    }
+
+    return back()->with('success', 'Products imported successfully.');
+}
+
 }
