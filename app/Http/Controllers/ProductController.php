@@ -3,204 +3,75 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Imports\ProductImport;
-use Maatwebsite\Excel\Facades\Excel;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProductController extends Controller
 {
-
+    /**
+     * Display a paginated list of products.
+     */
     public function index()
     {
-        $merchantId = auth()->user()->merchant_id ?? auth()->id();
-        $products = Product::with('category')
-            ->where('merchant_id', $merchantId)
-            ->get();
+        $products = Product::orderBy('created_at', 'desc')->paginate(10);
 
-        $categories = Category::where('merchant_id', $merchantId)->get(); // ← this must exist
-
-        return Inertia::render('Merchant/Products', [
-            'products' => $products,
-            'categories' => $categories,
+        return Inertia::render('Admin/Products', [
+            'products' => $products
         ]);
     }
 
-
+    /**
+     * Store a new product.
+     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'category_id' => 'nullable|exists:categories,id',
+            'price' => 'nullable|numeric|min:0',
+            'description' => 'nullable|string',
         ]);
 
-        $merchantId = Auth::id(); // or Auth::user()->merchant_id if applicable
+        Product::create($data);
 
-        Product::create([
-            'name' => $validated['name'],
-            'description' => $validated['description'],
-            'price' => $validated['price'],
-            'stock' => $validated['stock'],
-            'category_id' => $validated['category_id'],
-            'merchant_id' => $merchantId, // ✅ Important!
-        ]);
-
-        return redirect()->route('merchant.products')->with('success', 'Product added!');
+        return redirect()->back()->with('success', 'Product created successfully!');
     }
 
+    /**
+     * Update an existing product.
+     */
     public function update(Request $request, Product $product)
     {
-
-        $validated = $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
+            'price' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'category_id' => 'nullable|exists:categories,id',
         ]);
 
-        $product->update($validated);
-        
+        $product->update($data);
 
-        return redirect()->back()->with('success', 'Product updated successfully.');
+        return redirect()->back()->with('success', 'Product updated successfully!');
     }
 
+    /**
+     * Delete a product.
+     */
     public function destroy(Product $product)
     {
         $product->delete();
 
-        return redirect()->back()->with('success', 'Product deleted successfully.');
+        return redirect()->back()->with('success', 'Product deleted successfully!');
     }
+    public function destroyAll(Request $request)
+    {
+        $productIds = $request->input('product_ids', []);
 
- public function exportProductsCsv(Request $request)
-{
-    $categoryIds = $request->input('category_id'); // Expecting array of IDs
-  
-    // Ensure it's always an array (in case of single value passed)
-    if (!is_array($categoryIds) && $categoryIds !== null) {
-        $categoryIds = [$categoryIds];
-    }
-
-    // Fetch products with optional category filtering
-    $products = Product::with('category')
-        ->when(!empty($categoryIds), function ($query) use ($categoryIds) {
-            $query->whereIn('category_id', $categoryIds);
-        })
-        ->get();
-
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-
-    // Set column headers
-    $sheet->fromArray([
-        ['Category', 'Name', 'Description', 'Price', 'Stock']
-    ]);
-
-    // Fill in product rows
-    $rowIndex = 2;
-    foreach ($products as $product) {
-        $sheet->fromArray([
-            [
-                $product->category->name ?? 'Uncategorized',
-                $product->name,
-                $product->description,
-                $product->price,
-                $product->stock,
-            ]
-        ], null, 'A' . $rowIndex++);
-    }
-
-    $filename = 'products_' . now()->format('Ymd_His') . '.xlsx';
-
-    return new StreamedResponse(function () use ($spreadsheet) {
-        $writer = new Xlsx($spreadsheet);
-        $writer->save('php://output');
-    }, 200, [
-        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition' => "attachment; filename=\"$filename\"",
-        'Cache-Control' => 'max-age=0',
-    ]);
-}
-
-
-public function upload(Request $request)
-{
-    $request->validate([
-        'file' => 'required|file|mimes:xlsx,xls',
-    ]);
-
-    $file = $request->file('file');
-    $spreadsheet = IOFactory::load($file->getPathname());
-    $sheet = $spreadsheet->getActiveSheet();
-    $rows = $sheet->toArray();
-
-    // Remove header row
-    unset($rows[0]);
-
-    $merchantId = Auth::id();
-
-    foreach ($rows as $row) {
-        $name = $row[0] ?? null;
-        $price = $row[1] ?? null;
-        $barcode = $row[2] ?? null;
-        $categoryName = $row[3] ?? null;
-        $stock = $row[4] ?? 0;
-        $description = $row[5] ?? null;
-
-        // Validate essential fields
-        if (!$name || !$price || !$categoryName) {
-            continue;
+        if (empty($productIds)) {
+            return redirect()->back()->with('error', 'No products selected for deletion.');
         }
 
-        // Create or find category with merchant_id
-        $category = Category::firstOrCreate(
-            [
-                'name' => $categoryName,
-                'merchant_id' => $merchantId
-            ]
-        );
+        Product::whereIn('id', $productIds)->delete();
 
-        // Generate barcode if not provided
-        if (!$barcode) {
-            $barcode = 'BC-' . strtoupper(Str::random(8));
-        }
-
-        // Check if product exists
-        $existingProduct = Product::where('name', $name)
-            ->where('category_id', $category->id)
-            ->where('merchant_id', $merchantId)
-            ->first();
-
-        if ($existingProduct) {
-            $existingProduct->update([
-                'price' => $price,
-                'barcode' => $barcode,
-                'stock' => $stock,
-                'description' => $description,
-            ]);
-        } else {
-            Product::create([
-                'name' => $name,
-                'price' => $price,
-                'barcode' => $barcode,
-                'stock' => $stock,
-                'description' => $description,
-                'category_id' => $category->id,
-                'merchant_id' => $merchantId,
-            ]);
-        }
+        return redirect()->back()->with('success', 'Selected products deleted successfully!');
     }
-
-    return back()->with('success', 'Products imported successfully.');
-}
 
 }

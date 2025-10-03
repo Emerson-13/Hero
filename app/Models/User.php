@@ -22,11 +22,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',  
-        'merchant_id', // ✅ this must be here!
-        'is_approved',
-        'company_name', 
-        'address',
-        "pospin"
+        'is_active',
+        'is_suspended',
+        'payment_status',
+        'phone', 
+        'address', 
+        'package_id',
+        'title_id',
+        'created_by',
     ];
 
     /**
@@ -51,9 +54,54 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-    // In User.php
-public function categories() {
-    return $this->hasMany(Category::class, 'merchant_id');
-}
 
-}
+    public function referralCode()
+    {
+        return $this->hasOne(ReferralCode::class,'user_id');
+    }
+    // The referral record where this user was referred
+    public function referral() {
+        return $this->hasOne(Referral::class, 'referred_user_id', 'id');
+    }
+
+    // The user who referred this user
+    public function referrer() {
+        return $this->belongsTo(User::class, 'referrer_id', 'id');
+    }
+
+    public function referrals()
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    public function referredBy()
+    {
+        return $this->hasMany(Referral::class, 'referred_user_id');
+    }
+    public function activationCode()
+    {
+        return $this->hasOne(ActivationCode::class, 'used_by', 'id');
+    }
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
+    }
+    public function package()
+    {
+        return $this->belongsTo(Package::class, 'package_id');
+    }
+    // app/Models/User.php
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+        public function title()
+    {
+        return $this->belongsTo(Title::class);
+    }
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+}   

@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Validation\ValidationException;
+
 
 class AuthenticatedSessionController extends Controller
 {
@@ -30,32 +32,48 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->validate([
-                'email' => ['required', 'string', 'email'],
-                'password' => ['required', 'string'],
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+            return back()->withErrors([
+                'email' => 'The provided credentials do not match our records.',
+            ])->onlyInput('email');
+        }
+
+        $user = Auth::user();
+
+        // ✅ Check approval only for member roles
+        if ($user->hasAnyRole(['premium member', 'standard member']) && !$user->is_active) {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Your account is not approved yet. Please wait for admin approval.',
             ]);
+        }
+        if ($user->is_suspended) {
+            Auth::logout();
 
-            if (! Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
-                return back()->withErrors([
-                    'email' => 'The provided credentials do not match our records.',
-                ])->onlyInput('email');
-            }
+            throw ValidationException::withMessages([
+                'email' => 'Your account is suspended. Please wait for your suspension to be lifted.',
+            ]);
+        }
 
-            $request->session()->regenerate();
+        // ✅ Regenerate session only after validation passes
+        $request->session()->regenerate();
 
-            // Redirect logic based on role
-            $user = Auth::user();
-
-            if ($user->hasRole('admin')) {
-                return redirect()->route('dashboard'); // or 'admin.dashboard' if you define one
-            } elseif ($user->hasRole('merchant')) {
-                return redirect()->route('merchant.dashboard');
-            } elseif ($user->hasRole('staff')) {
-                return redirect()->route('staff.dashboard');
-            }
-
-            // fallback
+        // Redirect logic based on role
+        if ($user->hasRole('admin')) {
+            return redirect()->route('admin.dashboard');
+        } elseif ($user->hasAnyRole(['premium member', 'standard member'])) {
             return redirect()->route('dashboard');
         }
+
+        // fallback
+        return redirect()->route('dashboard');
+    }
+
 
     /**
      * Destroy an authenticated session.

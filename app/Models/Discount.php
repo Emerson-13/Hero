@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Discount extends Model
 {
     protected $fillable = [
-        'merchant_id',
+        'user_id',
         'code',
         'type',
         'value',
@@ -21,4 +21,8 @@ class Discount extends Model
         'target_ids' => 'array',
         'is_active' => 'boolean',
     ];
+       public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

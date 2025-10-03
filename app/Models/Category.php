@@ -1,26 +1,24 @@
 <?php
 
 namespace App\Models;
-use App\Models\User;
+
 use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
-    
+
      protected $fillable = [
+        'user_id',
         'name',
         'description',
-        'merchant_id'
+        'is_discountable'
      ];
-    
-    
-    
     public function products()
     {
         return $this->hasMany(Product::class);
     }
-    public function merchant()
+    public function user()
     {
-        return $this->belongsTo(User::class, 'merchant_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

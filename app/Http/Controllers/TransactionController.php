@@ -3,10 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -14,12 +12,27 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TransactionController extends Controller
 {
-    public function index( )
+    public function index(Request $request)
     {
-        $transaction = Transaction::where('merchant_id', Auth::id())->get();
+        $userId = auth()->id();
+        $query = Transaction::where('user_id', $userId);
 
-        return Inertia::render('Merchant/Transactions', [
+         if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%$search%")
+                ->orWhere('payment_method', 'like', "%$search%")
+                ->orWhere('reference_number', 'like', "%$search%");
+            });
+        }
+
+        $transaction = $query->orderBy('id', 'desc')
+            ->paginate(10)
+            ->withQueryString();
+
+        return Inertia::render('User/Transaction', [
         'transaction' => $transaction,
+        'search' => $request->search ?? '',
         ]);
     }
     
@@ -32,7 +45,7 @@ class TransactionController extends Controller
 
         // Set headings
         $sheet->fromArray([
-            ['Customer Name', 'Invoice #', 'Amount Paid', 'Total', 'Change', 'Payment Method', 'Reference #', 'Date']
+            ['Invoice #', 'Amount Paid', 'Change', 'Payment Method', 'Reference #', 'Date']
         ]);
 
         // Populate rows
@@ -40,10 +53,8 @@ class TransactionController extends Controller
         foreach ($transactions as $txn) {
             $sheet->fromArray([
                 [
-                    $txn->customer_name,
                     $txn->invoice_number,
                     $txn->amount_paid,
-                    $txn->total,
                     $txn->change,
                     $txn->payment_method,
                     $txn->reference_number,

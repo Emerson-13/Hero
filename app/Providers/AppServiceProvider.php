@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
 
@@ -23,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
          
-        Inertia::share('auth', function () {
+       Inertia::share('auth', function () {
         $user = auth()->user();
         return [
             'user' => $user ? $user->only('id', 'name', 'email') + [
@@ -31,5 +32,5 @@ class AppServiceProvider extends ServiceProvider
             ] : null,
         ];
     });
-    }
+}
 }

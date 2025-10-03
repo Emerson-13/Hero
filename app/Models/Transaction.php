@@ -2,40 +2,32 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Transaction extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'merchant_id',
-        'staff_id',
-        'customer_name',
-        'invoice_number',
+        'order_id',
+        'user_id',
+        'amount',
         'payment_method',
-        'amount_paid',
-        'total',
-        'reference_number',
-        'subtotal',      
-        'discount',
-        'tax',   
-        'change'  
+        'status',
+        'reference_no',
+        'invoice_number',
+        'transaction_date'
     ];
 
-    public function merchant()
+    // 🔗 Relationships
+    public function order()
     {
-        return $this->belongsTo(User::class, 'merchant_id');
+        return $this->belongsTo(Order::class);
     }
 
-    public function staff()
+    public function user()
     {
-        return $this->belongsTo(User::class, 'staff_id');
-    }
-
-    public function sales()
-    {
-        return $this->hasMany(Sale::class);
+        return $this->belongsTo(User::class);
     }
 }

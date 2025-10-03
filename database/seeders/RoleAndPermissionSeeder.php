@@ -10,61 +10,107 @@ class RoleAndPermissionSeeder extends Seeder
 {
     public function run(): void
     {
-      
-
-        // Create Permissions for Page Views
+        // --- Step 1: Define Permissions ---
         $permissions = [
             'view dashboard',
-            'view merchant-dashboard',
-            'view staff-dashboard',
-            'view manage-users',
-            'view business',
-            'view products',
-            'view categories',
-            'view sales',
-            'view transactions',
-            'view pos',
-            'view staff',
-            'view settings',
-            'view discounts',
-            'view payments',
-            'view printerSetting',
+            'manage member',
+            'manage packages',
+            'manage products',
+            'manage payment',
+            'manage bank',
+            'manage announcements',
+            'manage genealogy',
+            'manage activation-code',
+            'manage role',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
+            'manage order',
+            'manage order-view',
+            'manage transaction'
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        // Admin Role
+        // --- Step 2: Admin Role ---
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->givePermissionTo([
             'view dashboard',
-            'view manage-users',
-            'view business',
+            'manage member',
+            'manage packages',
+            'manage products',
+            'manage payment',
+            'manage bank',
+            'manage announcements',
+            'manage genealogy',
+            'manage activation-code',
+            'manage role',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
+            'manage order',
+            'manage order-view',
+            'manage transaction'
+        ]);
+        $moderator = Role::firstOrCreate(['name' => 'moderator']);
+        $moderator->givePermissionTo([
+            'view dashboard',
+            'manage member',
+            'manage packages',
+            'manage products',
+            'manage payment',
+            'manage bank',
+            'manage announcements',
+            'manage genealogy',
+            'manage activation-code',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
+            'manage order',
+            'manage order-view',
+            'manage transaction'
         ]);
 
-        // Merchant Role
-        $merchant = Role::firstOrCreate(['name' => 'merchant']);
-        $merchant->givePermissionTo([
-            'view merchant-dashboard',
-            'view products',
-            'view categories',
-            'view sales',
-            'view transactions',
-            'view pos',
-            'view staff',
-            'view settings',
-            'view discounts',
-            'view payments',
-            'view printerSetting',
+        $CustomerSupport = Role::firstOrCreate(['name' => 'customer support']);
+        $CustomerSupport->givePermissionTo([
+            'view dashboard',
+            'manage member',
+            'manage packages',
+            'manage products',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
         ]);
 
-        // Staff Role
-        $staff = Role::firstOrCreate(['name' => 'staff']);
-        $staff->givePermissionTo([
-            'view staff-dashboard',
-            'view pos',
-            'view products',
+        // --- Step 3: Member Roles ---
+        $PremiumMember = Role::firstOrCreate(['name' => 'premium member']);
+        $PremiumMember->givePermissionTo([
+            'view dashboard',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
+            'manage order',
+            'manage order-view',
+            'manage transaction'
+        ]);
+
+        $StandardMember = Role::firstOrCreate(['name' => 'standard member']);
+        $StandardMember->givePermissionTo([
+            'view dashboard',
+            'manage category',
+            'manage items',
+            'manage menus',
+            'manage ingredients',
+            'manage order',
+            'manage order-view',
+            'manage transaction'
         ]);
     }
 }

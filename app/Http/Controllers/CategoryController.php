@@ -5,29 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CategoryController extends Controller
 {
     // Display all categories
-    public function index( )
-    {
-        $categories = Category::where('merchant_id', Auth::id())->get();
+    public function index(Request $request)
+{
+    $UserId = auth()->id();
 
-        return Inertia::render('Merchant/Categories', [
-            'categories' => $categories,
-        ]);
+    $query = Category::where('user_id', $UserId);
+
+    // Filter by search keyword
+    if ($request->has('search') && $request->search !== '') {
+        $search = $request->search;
+        $query->where('name', 'like', "%$search%");
     }
 
-    // Show create form (optional, if using a modal just skip this)
-    public function create()
-    {
-        return Inertia::render('Merchant/Categories/Create');
-    }
+    $categories = $query->orderBy('id', 'desc')
+        ->paginate(10)
+        ->withQueryString();
+
+    return Inertia::render('User/Category', [
+        'categories' => $categories,
+        'search' => $request->search ?? '',
+    ]);
+}
+
 
     // Store a new category
     public function store(Request $request)
@@ -39,21 +43,12 @@ class CategoryController extends Controller
         ]);
 
         Category::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'merchant_id' => Auth::id(),
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'user_id' => Auth::id(),
         ]);
 
-
-        return redirect()->route('merchant.categories')->with('success', 'Category created.');
-    }
-
-    // Edit page (optional — or use modal)
-    public function edit(Category $category)
-    {
-        return Inertia::render('Merchant/Categories/Edit', [
-            'category' => $category,
-        ]);
+        return redirect()->route('user.categories')->with('success', 'Category created.');
     }
 
     public function update(Request $request, Category $category)
